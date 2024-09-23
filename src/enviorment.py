@@ -178,7 +178,7 @@ class GPSD_ENV(gym.Env):
             pygame.quit()
             
 if __name__ == '__main__':
-      env = GPSD_ENV('./images/test.png', render='human')
+      env = GPSD_ENV('./../images/test.png', render='human')
       env.reset()
       env.render()
 
@@ -203,7 +203,6 @@ if __name__ == '__main__':
                         elif event.key == pygame.K_a:
                               observation, reward, terminated, trun,info  =env.step(3)  # Move south-west
                         env.render()
-                  print(terminated)
                   if (terminated):
                         env.reset()
 
