@@ -14,4 +14,4 @@ action_noise = NormalActionNoise(mean=np.zeros(6), sigma=0.1 * np.ones(6))
 # Create the model
 model = DQN("MultiInputPolicy", env, verbose=1, device=device, learning_rate = 0.01)
 model.learn(total_timesteps=10000)
-model.save("ddpg_move_env")
+model.save("DQN_test")
