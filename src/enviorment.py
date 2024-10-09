@@ -30,7 +30,7 @@ class GPSD_ENV(gym.Env):
             
 
             pygame.init()
-            self.screen = pygame.display.set_mode((self.window_size, self.window_size))  # Adjust size as needed
+            self.screen = pygame.display.set_mode((self.window_size, self.window_size))  
             pygame.display.set_caption('Hexagonal Grid Environment')
             
             self.background_color = (255, 255, 255)
@@ -43,6 +43,9 @@ class GPSD_ENV(gym.Env):
             self.hex_height = math.sqrt(3) * self.hex_radius
             self.hex_width = 2 * self.hex_radius
             self.size = self.window_size // self.hex_width
+            
+            self.size_width = math.ceil(self.window_size / self.hex_height ) +2
+            self.size_height = math.ceil(self.window_size / self.hex_width) +2
             
             
       def get_movement_from_action(self, action):
@@ -88,8 +91,8 @@ class GPSD_ENV(gym.Env):
             super().reset(seed=seed)
 
             # Choose the agent's location uniformly at random
-            self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
-            self._target_location = self.np_random.integers(0, self.size, size=2, dtype=int)
+            self._agent_location = [self.np_random.integers(0, self.size_height, size=1, dtype=int)[0], self.np_random.integers(0, self.size_width,size=1, dtype=int)[0]]
+            self._target_location = [self.np_random.integers(0, self.size_height, size=1, dtype=int)[0], self.np_random.integers(0, self.size_width, size=1, dtype=int)[0]]
 
             # We will sample the target's location randomly until it does not coincide with the agent's location
             # self._target_location = (5,10)
@@ -121,7 +124,7 @@ class GPSD_ENV(gym.Env):
                   reward = 100000
                   terminated = True
                   print("Success")
-            elif(self._agent_location.min() < 0 or self._agent_location.max() > self.size):
+            elif(self._agent_location.min() < 0 or self._agent_location.max() > max(self.size_height, self.size_width)):
                   reward = -100000
                   terminated = True
                   print("Fail")
@@ -150,22 +153,22 @@ class GPSD_ENV(gym.Env):
             self.screen.blit(img, (0, 0))
 
             # Draw hexagonal grid
-            for q in range(self.size):
-                  for r in range(self.size):
+            for q in range(self.size_height):
+                  for r in range(self.size_width):
                   # Calculate hexagon center position
                         x = r * (self.hex_width - (math.cos(1.0472) * self.hex_radius)) 
 
                         y = q * (self.hex_height) + ((r%2) * math.sin(1.0472) * self.hex_radius)
 
                         # Draw hexagon
-                        self.draw_hexagon(self.screen, self.hex_color, (x + 50, y + 50), self.hex_radius)
+                        self.draw_hexagon(self.screen, self.hex_color, (x, y), self.hex_radius)
 
                         # If this hexagon is the agent's position, draw the agent
                         if np.array_equal(self._agent_location, np.array([q, r])):
-                              pygame.draw.circle(self.screen, self.agent_color, (int(x + 50), int(y + 50)), self.hex_radius // 2)
+                              pygame.draw.circle(self.screen, self.agent_color, (int(x), int(y)), self.hex_radius // 2)
                          # If this hexagon is the target's position, draw the agent
                         if np.array_equal(self._target_location, np.array([q, r])):
-                              pygame.draw.circle(self.screen, self.target_color, (int(x + 50), int(y + 50)), self.hex_radius // 2)
+                              pygame.draw.circle(self.screen, self.target_color, (int(x), int(y)), self.hex_radius // 2)
 
             # Update the display
             pygame.display.flip()
@@ -178,7 +181,7 @@ class GPSD_ENV(gym.Env):
             pygame.quit()
             
 if __name__ == '__main__':
-      env = GPSD_ENV('./../images/test.png', render='human')
+      env = GPSD_ENV('./../images/2018.png', render='human')
       env.reset()
       env.render()
 
