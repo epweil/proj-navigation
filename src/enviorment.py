@@ -8,6 +8,7 @@ import numpy as np
 from gymnasium.envs.registration import register
 import math
 from PIL import Image
+import random
 # from setuptools import setup
 
 
@@ -48,6 +49,10 @@ class GPSD_ENV(gym.Env):
             self.size_height = math.ceil(self.window_size / self.hex_width) +2
             
             
+            
+            
+      
+            
       def get_movement_from_action(self, action):
             if(self._agent_location[1] % 2 == 0):
                   _action_to_direction = {
@@ -79,10 +84,20 @@ class GPSD_ENV(gym.Env):
             
       def _get_obs(self):
             return {"agent": self._agent_location, "target": self._target_location}
-      
-      def _get_info(self):
+      def _feature_map_position(self, expected_positions):
+            
+            
+      def _get_info(self, old_position, action_in):
+            expected_positions = {} 
+            for action in range(6):
+                  if action == action_in:
+                        expected_positions[old_position + self.get_movement_from_action(action)] = 0.775
+                  else:
+                        expected_positions[old_position + self.get_movement_from_action(action)] = 0.025
             return({
-                  'distance': np.linalg.norm(np.array(self._agent_location) - np.array(self._target_location), ord=1)
+                  'distance': np.linalg.norm(np.array(self._agent_location) - np.array(self._target_location), ord=1),
+                  'expected_positions': expected_positions,
+                  'feature_match_position': 
             })
       def reset(self, starting_pos = None, seed = None, ):
             
@@ -107,16 +122,21 @@ class GPSD_ENV(gym.Env):
 
             return observation, info
       
-      def step(self,action):
-            
+      def step(self,action_in):
+            #ADD NOISE 
+            action_in = action
+            if(random.random() <= 0.15):
+                  action = random.randint(0,5)
+                  
+                  
             direction = self.get_movement_from_action(action)
-            
+            old_position = self._agent_location
             self._agent_location = self._agent_location + direction
             
             got_to_target = np.array_equal(self._agent_location, self._target_location)
             
             observation = self._get_obs()
-            info = self._get_info()
+            info = self._get_info(old_position, action_in)
             
             reward = -info['distance']
             
