@@ -10,6 +10,7 @@ import math
 from PIL import Image
 import random
 
+from feature_extraction import FIASS_Embedding, Query_Image, Refrence_Image
 from helper import uncertinity_function
 # from setuptools import setup
 
@@ -18,13 +19,17 @@ CORRECT_MOVE_PROBABILITY = 0.775
 
 class GPSD_ENV(gym.Env):
       metadata = { "render_fps": 4}
-      def __init__(self, image_path, render=None, size  = 10):
+      def __init__(self, refrence_image_path, query_image_path, render=None, size  = 10):
             self.render_mode = render
             super(GPSD_ENV, self).__init__()
-            self.img = Image.open(image_path)
-            self.img = self.img.resize((self.img.size[0]//2,self.img.size[1]//2))
-            self.img_path = image_path
-            self.window_size = self.img.size[0]
+            self.hex_radius = 50
+            
+            
+            self.FIASS = FIASS_Embedding()
+            self.refrence_image = Refrence_Image(refrence_image_path, self.FIASS, self.hex_radius)
+            self.query_image = Query_Image(query_image_path, self.hex_radius)
+            
+            self.window_size = max(self.query_image.image.size[0], self.query_image.image.size[1])
             
             self.observation_space= spaces.Dict({
                   'agent': spaces.Box(0, size - 1, shape=(2,), dtype=int),
@@ -42,15 +47,16 @@ class GPSD_ENV(gym.Env):
             self.hex_color = (255, 0, 0)
             self.agent_color = (0, 0, 255)
             self.target_color = (0, 255, 0)
+            self.predicted_locatation_color = (255, 255, 255)
 
             # Hexagon size and geometry calculations
-            self.hex_radius = 10
+            
             self.hex_height = math.sqrt(3) * self.hex_radius
             self.hex_width = 2 * self.hex_radius
             self.size = self.window_size // self.hex_width
             
-            self.size_width = math.ceil(self.window_size / self.hex_height ) +2
-            self.size_height = math.ceil(self.window_size / self.hex_width) +2
+            self.size_width = math.ceil(self.window_size / self.hex_height ) 
+            self.size_height = math.ceil(self.window_size / self.hex_width)
             
             
             
@@ -91,21 +97,35 @@ class GPSD_ENV(gym.Env):
             
      
             
-      def _get_info(self, old_position, action_in):
-            number_to_check = 5
-            self.get_image
-            for x in range(max(0,self._agent_predicted_location[0] - number_to_check), min(self._agent_predicted_location[0]+number_to_check, self.size_width)):
-                  for y in range(max(0,self._agent_predicted_location[1] - number_to_check), min(self._agent_predicted_location[1]+number_to_check, self.size_height)):
-                        probability_of_position_location = uncertinity_function(self._agent_predicted_location, (x,y)) 
-                        probability_of_position_feature_mapping = uncertinity_function(self._agent_predicted_location, (x,y)) 
-                        
-                        
-                              
+      def _get_info(self, action_in = None):
+            if(action_in is None):
+                  predicted_location_x = self._agent_predicted_location[0]
+                  predicted_location_y = self._agent_predicted_location[1] 
+            else:
+                  number_to_check = 5
+                  location_from_features_x = []
+                  location_from_features_y = []
+                  probability_of_position_locations = []
+                  
+                  for x in range(max(0,self._agent_predicted_location[0] - number_to_check), min(self._agent_predicted_location[0]+number_to_check, self.size_width)):
+                        for y in range(max(0,self._agent_predicted_location[1] - number_to_check), min(self._agent_predicted_location[1]+number_to_check, self.size_height)):
+                              probability_of_position_locations.append(uncertinity_function(self._agent_predicted_location, (x,y)) )
+                              loc = (self.query_image.get_best_guess_of_positon((x,y), self.refrence_image, self.FIASS))
+                              location_from_features_x.append(loc[0])
+                              location_from_features_y.append(loc[1])
+                  location_from_features_x = np.asarray(location_from_features_x)
+                  location_from_features_y = np.asarray(location_from_features_y)
+                  probability_of_position_locations = np.asarray(probability_of_position_locations)
+                  probability_of_position_locations = probability_of_position_locations / probability_of_position_locations.max()
+                  location_from_features_x *= probability_of_position_locations
+                  location_from_features_y *= probability_of_position_locations
+                  predicted_location_x = round(location_from_features_x.mean())
+                  predicted_location_y = round(location_from_features_y.mean())
+                  print(predicted_location_x, predicted_location_y)
             
             return({
-                  'distance': np.linalg.norm(np.array(self._agent_location) - np.array(self._target_location), ord=1),
-                  'expected_positions': expected_positions,
-                  'feature_match_position': 
+                  'distance': np.linalg.norm(np.array([predicted_location_x,predicted_location_y]) - np.array(self._target_location), ord=1),
+                  'predicted_locatation': (predicted_location_x,predicted_location_y)
             })
       def reset(self, starting_pos = None, seed = None, ):
             
@@ -133,20 +153,21 @@ class GPSD_ENV(gym.Env):
       
       def step(self,action_in):
             #ADD NOISE 
-            action_in = action
+            action = action_in
             if(random.random() <= 1-CORRECT_MOVE_PROBABILITY):
                   action = random.randint(0,5)
                   
                   
             direction = self.get_movement_from_action(action)
-            old_position = self._agent_location
+            direction_predicted = self.get_movement_from_action(action_in)
+            self._agent_predicted_location = self._agent_predicted_location + direction_predicted
             self._agent_location = self._agent_location + direction
             
             got_to_target = np.array_equal(self._agent_location, self._target_location)
             
             observation = self._get_obs()
-            info = self._get_info(old_position, action_in)
-            
+            info = self._get_info(action_in)
+            self._agent_predicted_location = info['predicted_locatation']
             reward = -info['distance']
             
             if(got_to_target):
@@ -177,7 +198,7 @@ class GPSD_ENV(gym.Env):
 
       def render(self, mode='human'):
             # Clear screen with background color
-            img = pygame.image.load(self.img_path)
+            img = pygame.image.load(self.query_image.image_path)
 
             self.screen.blit(img, (0, 0))
 
@@ -198,6 +219,9 @@ class GPSD_ENV(gym.Env):
                          # If this hexagon is the target's position, draw the agent
                         if np.array_equal(self._target_location, np.array([q, r])):
                               pygame.draw.circle(self.screen, self.target_color, (int(x), int(y)), self.hex_radius // 2)
+                        # If this hexagon is the predicted position, draw the agent
+                        if np.array_equal(self._agent_predicted_location, np.array([q, r])):
+                              pygame.draw.circle(self.screen, self.predicted_locatation_color, (int(x), int(y)), self.hex_radius // 2)
 
             # Update the display
             pygame.display.flip()
@@ -210,7 +234,7 @@ class GPSD_ENV(gym.Env):
             pygame.quit()
             
 if __name__ == '__main__':
-      env = GPSD_ENV('./../images/2018.png', render='human')
+      env = GPSD_ENV('./../images/2016.png', './../images/2018.png', render='human')
       env.reset()
       env.render()
 

@@ -56,6 +56,7 @@ class FIASS_Embedding():
             # Add vectors to the index with IDs
             index.add_with_ids(vectors, np.array(range(len(embeddings))))
             
+            
             # Save the index
             if(output_path):
                   faiss.write_index(index, output_path)
@@ -77,7 +78,7 @@ class FIASS_Embedding():
                         for row in hex_images:
                               for img_path in row:
                                     f.write(f'{img_path.pixel_locatation[0],img_path.pixel_locatation[1]}' + '\n')
-            
+            self.load_faiss_index(output_path)
             return index
 
 
@@ -99,6 +100,7 @@ class FIASS_Embedding():
             
             query_features = self.model.encode(query)
             query_features = query_features.astype(np.float32).reshape(1, -1)
+            print(self.current_index)
             if(self.current_index is None):
                   raise Exception("Must set index of FIASS Object")
             distances, indices = self.current_index.search(query_features, top_k)
@@ -228,7 +230,6 @@ class Query_Image(Input_Image):
       def __init__(self,image_path, hex_radius = 50,):
             super().__init__(image_path,  hex_radius = 50,)
       def get_best_guess_of_positon(self,postion:tuple, refrence:Refrence_Image, FIASS_INSTANCE:FIASS_Embedding, top_k = 5):
-            FIASS_INSTANCE.load_faiss_index(refrence.index_path)
             print(postion)
             image = self.hexagon_images[postion[0]][postion[1]].image
             query, retrieved_locatations,retrieved_grid_locatations, retrieved_pixel_locatations,  distances = FIASS_INSTANCE.retrieve_similar_images(image,top_k)
@@ -236,7 +237,7 @@ class Query_Image(Input_Image):
             distances = distances/(distances).max()
             pred_coord_x = []
             pred_coord_y = []
-            for locatation, distance in zip(retrieved_pixel_locatations, distances):
+            for locatation, distance in zip(retrieved_grid_locatations, distances):
                   retreived_coord_x,retreived_coord_y = locatation
                   retreived_coord_x = float(retreived_coord_x[1:])
                   retreived_coord_y = float(retreived_coord_y[:-1])
