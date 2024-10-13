@@ -9,7 +9,11 @@ from gymnasium.envs.registration import register
 import math
 from PIL import Image
 import random
+
+from helper import uncertinity_function
 # from setuptools import setup
+
+CORRECT_MOVE_PROBABILITY = 0.775
 
 
 class GPSD_ENV(gym.Env):
@@ -84,16 +88,20 @@ class GPSD_ENV(gym.Env):
             
       def _get_obs(self):
             return {"agent": self._agent_location, "target": self._target_location}
-      def _feature_map_position(self, expected_positions):
             
+     
             
       def _get_info(self, old_position, action_in):
-            expected_positions = {} 
-            for action in range(6):
-                  if action == action_in:
-                        expected_positions[old_position + self.get_movement_from_action(action)] = 0.775
-                  else:
-                        expected_positions[old_position + self.get_movement_from_action(action)] = 0.025
+            number_to_check = 5
+            self.get_image
+            for x in range(max(0,self._agent_predicted_location[0] - number_to_check), min(self._agent_predicted_location[0]+number_to_check, self.size_width)):
+                  for y in range(max(0,self._agent_predicted_location[1] - number_to_check), min(self._agent_predicted_location[1]+number_to_check, self.size_height)):
+                        probability_of_position_location = uncertinity_function(self._agent_predicted_location, (x,y)) 
+                        probability_of_position_feature_mapping = uncertinity_function(self._agent_predicted_location, (x,y)) 
+                        
+                        
+                              
+            
             return({
                   'distance': np.linalg.norm(np.array(self._agent_location) - np.array(self._target_location), ord=1),
                   'expected_positions': expected_positions,
@@ -107,6 +115,7 @@ class GPSD_ENV(gym.Env):
 
             # Choose the agent's location uniformly at random
             self._agent_location = [self.np_random.integers(0, self.size_height, size=1, dtype=int)[0], self.np_random.integers(0, self.size_width,size=1, dtype=int)[0]]
+            self._agent_predicted_location = self._agent_location
             self._target_location = [self.np_random.integers(0, self.size_height, size=1, dtype=int)[0], self.np_random.integers(0, self.size_width, size=1, dtype=int)[0]]
 
             # We will sample the target's location randomly until it does not coincide with the agent's location
@@ -125,7 +134,7 @@ class GPSD_ENV(gym.Env):
       def step(self,action_in):
             #ADD NOISE 
             action_in = action
-            if(random.random() <= 0.15):
+            if(random.random() <= 1-CORRECT_MOVE_PROBABILITY):
                   action = random.randint(0,5)
                   
                   
