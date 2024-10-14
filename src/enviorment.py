@@ -15,7 +15,7 @@ from helper import uncertinity_function
 # from setuptools import setup
 
 CORRECT_MOVE_PROBABILITY = 0.775
-
+SAVED = True
 
 class GPSD_ENV(gym.Env):
       metadata = { "render_fps": 4}
@@ -26,8 +26,8 @@ class GPSD_ENV(gym.Env):
             
             
             self.FIASS = FIASS_Embedding()
-            self.refrence_image = Refrence_Image(refrence_image_path, self.FIASS, self.hex_radius)
-            self.query_image = Query_Image(query_image_path, self.hex_radius)
+            self.refrence_image = Refrence_Image(refrence_image_path, self.FIASS, self.hex_radius, SAVED)
+            self.query_image = Query_Image(query_image_path, self.hex_radius, SAVED)
             
             self.window_size = max(self.query_image.image.size[0], self.query_image.image.size[1])
             
@@ -102,27 +102,39 @@ class GPSD_ENV(gym.Env):
                   predicted_location_x = self._agent_predicted_location[0]
                   predicted_location_y = self._agent_predicted_location[1] 
             else:
-                  number_to_check = 5
-                  location_from_features_x = []
-                  location_from_features_y = []
+                  number_to_check = 2
+                  loc = []
                   probability_of_position_locations = []
-                  
-                  for x in range(max(0,self._agent_predicted_location[0] - number_to_check), min(self._agent_predicted_location[0]+number_to_check, self.size_width)):
-                        for y in range(max(0,self._agent_predicted_location[1] - number_to_check), min(self._agent_predicted_location[1]+number_to_check, self.size_height)):
-                              probability_of_position_locations.append(uncertinity_function(self._agent_predicted_location, (x,y)) )
-                              loc = (self.query_image.get_best_guess_of_positon((x,y), self.refrence_image, self.FIASS))
-                              location_from_features_x.append(loc[0])
-                              location_from_features_y.append(loc[1])
-                  location_from_features_x = np.asarray(location_from_features_x)
-                  location_from_features_y = np.asarray(location_from_features_y)
+                  best_feature_mapping = []
+                  loc
+                  for ind, y in enumerate(range(max(0,self._agent_predicted_location[0] - number_to_check), min(self._agent_predicted_location[0]+number_to_check, self.size_width))):
+                        probability_of_position_locations.append([])
+                        best_feature_mapping.append([])
+                        loc.append([])
+                        for x in range(max(0,self._agent_predicted_location[1] - number_to_check), min(self._agent_predicted_location[1]+number_to_check, self.size_height)):
+                              probability_of_position_locations[ind].append(uncertinity_function(self._agent_predicted_location, (x,y)) )
+                              best_feature_mapping[ind].append(self.query_image.get_best_guess_of_positon((x,y), self.refrence_image, self.FIASS, top_k=1))
+                              loc.append([y,x])
+                  best_feature_mapping = np.asarray(best_feature_mapping)
                   probability_of_position_locations = np.asarray(probability_of_position_locations)
+                  
                   probability_of_position_locations = probability_of_position_locations / probability_of_position_locations.max()
-                  location_from_features_x *= probability_of_position_locations
-                  location_from_features_y *= probability_of_position_locations
-                  predicted_location_x = round(location_from_features_x.mean())
-                  predicted_location_y = round(location_from_features_y.mean())
-                  print(predicted_location_x, predicted_location_y)
-            
+                  probability_of_position_locations = 1-(10*probability_of_position_locations)
+                  # probability_of_position_locations = 10*probability_of_position_locations / probability_of_position_locations.mean()
+                  
+                  best_feature_mapping = best_feature_mapping / best_feature_mapping.max()
+                  best_feature_mapping = best_feature_mapping / best_feature_mapping.mean()
+                  
+                  maping = np.asarray(best_feature_mapping * probability_of_position_locations)
+                  predicted_location_y,predicted_location_x = loc[maping.argmax()]
+                  print(predicted_location_y,predicted_location_x)
+                  
+                  # location_from_features_x *= probability_of_position_locations
+                  # location_from_features_y *= probability_of_position_locations
+                  # predicted_location_x = round(location_from_features_x.mean())
+                  # predicted_location_y = round(location_from_features_y.mean())
+                  # location_from_features_y, location_from_features_x
+                  
             return({
                   'distance': np.linalg.norm(np.array([predicted_location_x,predicted_location_y]) - np.array(self._target_location), ord=1),
                   'predicted_locatation': (predicted_location_x,predicted_location_y)
@@ -221,7 +233,7 @@ class GPSD_ENV(gym.Env):
                               pygame.draw.circle(self.screen, self.target_color, (int(x), int(y)), self.hex_radius // 2)
                         # If this hexagon is the predicted position, draw the agent
                         if np.array_equal(self._agent_predicted_location, np.array([q, r])):
-                              pygame.draw.circle(self.screen, self.predicted_locatation_color, (int(x), int(y)), self.hex_radius // 2)
+                              pygame.draw.circle(self.screen, self.predicted_locatation_color, (int(x), int(y)), self.hex_radius // 4)
 
             # Update the display
             pygame.display.flip()

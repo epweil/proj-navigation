@@ -40,7 +40,6 @@ class FIASS_Embedding():
             return embeddings
 
       def create_faiss_index(self, embeddings, hex_images:list[HEXAGON_IMAGE], output_path = None):
-            print(output_path)
             
             if(os.path.exists(output_path) and os.path.isdir(output_path)):
                   shutil.rmtree(output_path,'r')
@@ -100,7 +99,6 @@ class FIASS_Embedding():
             
             query_features = self.model.encode(query)
             query_features = query_features.astype(np.float32).reshape(1, -1)
-            print(self.current_index)
             if(self.current_index is None):
                   raise Exception("Must set index of FIASS Object")
             distances, indices = self.current_index.search(query_features, top_k)
@@ -153,7 +151,7 @@ class FIASS_Embedding():
 
 
 class Input_Image():
-      def __init__(self, image_path, hex_radius):
+      def __init__(self, image_path, hex_radius, saved = False):
             self.image = Image.open(image_path)
             self.image_path = image_path
             self.image_height = self.image.size[0]
@@ -165,7 +163,9 @@ class Input_Image():
             self.num_hexes_height = math.ceil(self.image_height / self.hex_width) +2
             self.hexagon_images = self.get_hexagons()
             print("Done with GETTING HEXAGONS")
-            self.hexagon_imgages_dir = self.save_hexagon_images()
+            self.hexagon_imgages_dir = self.image_path[:-4] + "/hexagon_images"
+            if(not saved):
+                  self.save_hexagon_images(self.hexagon_imgages_dir)
             print("Done with SAVING HEXAGONS")
             
             
@@ -180,7 +180,7 @@ class Input_Image():
                         x = r * (self.hex_width - (math.cos(1.0472) * self.hex_radius)) 
                         y = q * (self.hex_height) + ((r%2) * math.sin(1.0472) * self.hex_radius) 
                         hex_image = crop_hexagon(self.image, (x, y), self.hex_radius)
-                        hex_image = HEXAGON_IMAGE(hex_image, (r,q),(x,y))
+                        hex_image = HEXAGON_IMAGE(hex_image, (q,r),(x,y))
                         hex_images[q].append(hex_image)
             return hex_images
 
@@ -208,15 +208,18 @@ class Input_Image():
                         cropped = hex_img.crop(imageBox)
                         cropped.save(f'{save_dir}/{x_pixel}_{y_pixel}.png')
                         img.save_path = f'{save_dir}/{x_pixel}_{y_pixel}.png'
-            return save_dir
             
 class Refrence_Image(Input_Image):
-      def __init__(self,image_path, FIASS:FIASS_Embedding,  hex_radius = 50,):
-            super().__init__(image_path, hex_radius)
+      def __init__(self,image_path, FIASS:FIASS_Embedding,  hex_radius = 50,saved = False):
+            super().__init__(image_path, hex_radius, saved = saved)
             print("Done with SUPER")
-            self.embeddings = FIASS.generate_clip_embeddings(self.hexagon_images)
-            self.FAISS_INDEX = FIASS.create_faiss_index(self.embeddings,self.hexagon_images,self.hexagon_imgages_dir + '/indexes/')
             self.index_path = self.hexagon_imgages_dir +'/indexes/index'
+            if(saved):
+                  FIASS.load_faiss_index(self.index_path)
+            else:
+                  self.embeddings = FIASS.generate_clip_embeddings(self.hexagon_images)
+                  self.FAISS_INDEX = FIASS.create_faiss_index(self.embeddings,self.hexagon_images,self.hexagon_imgages_dir + '/indexes/')
+                 
             
                   
       
@@ -227,24 +230,25 @@ class Refrence_Image(Input_Image):
      
       
 class Query_Image(Input_Image):
-      def __init__(self,image_path, hex_radius = 50,):
-            super().__init__(image_path,  hex_radius = 50,)
+      def __init__(self,image_path, hex_radius = 50, saved = False):
+            super().__init__(image_path,  hex_radius = 50, saved = saved)
       def get_best_guess_of_positon(self,postion:tuple, refrence:Refrence_Image, FIASS_INSTANCE:FIASS_Embedding, top_k = 5):
-            print(postion)
-            image = self.hexagon_images[postion[0]][postion[1]].image
+            image = self.hexagon_images[postion[1]][postion[0]].image
             query, retrieved_locatations,retrieved_grid_locatations, retrieved_pixel_locatations,  distances = FIASS_INSTANCE.retrieve_similar_images(image,top_k)
+      
             distances = distances[0]
-            distances = distances/(distances).max()
-            pred_coord_x = []
-            pred_coord_y = []
-            for locatation, distance in zip(retrieved_grid_locatations, distances):
-                  retreived_coord_x,retreived_coord_y = locatation
-                  retreived_coord_x = float(retreived_coord_x[1:])
-                  retreived_coord_y = float(retreived_coord_y[:-1])
-                  weight = np.exp(-distance)
-                  pred_coord_x.append(retreived_coord_x*weight)
-                  pred_coord_y.append(retreived_coord_y*weight)
-            pred_coord_x = np.asarray(pred_coord_x).mean()
-            pred_coord_y = np.asarray(pred_coord_y).mean()
+            # print("Max Distance", distances.max())
+            # distances = distances/(distances).max()
+            # pred_coord_x = []
+            # pred_coord_y = []
+            # for locatation, distance in zip(retrieved_grid_locatations, distances):
+            #       retreived_coord_x,retreived_coord_y = locatation
+            #       retreived_coord_x = float(retreived_coord_x[1:])
+            #       retreived_coord_y = float(retreived_coord_y[:-1])
+            #       weight = np.exp(-distance)
+            #       pred_coord_x.append(retreived_coord_x*weight)
+            #       pred_coord_y.append(retreived_coord_y*weight)
+            # pred_coord_x = np.asarray(pred_coord_x).mean()
+            # pred_coord_y = np.asarray(pred_coord_y).mean()
             
-            return (pred_coord_x,pred_coord_y)
+            return distances[0]
