@@ -1,5 +1,9 @@
 import math 
 from PIL import Image, ImageDraw
+import numpy as np
+
+
+
 def hex_corner(center, size, i):
       """Helper function to calculate hexagon corners."""
       angle_deg = 60 * i
@@ -16,9 +20,18 @@ def crop_hexagon(hex_image,center, hex_radius):
       
       background = Image.new("RGBA", hex_image.size, (0,0,0,0))
       new_img = Image.composite(hex_image, background, mask)
-      return new_img
+      min_x = min([point[0] for point in corners])
+      max_x = max([point[0] for point in corners])
+      min_y = min([point[1] for point in corners])
+      max_y = max([point[1] for point in corners])
+
+      # Crop the image to the bounding box
+      bounding_box = (min_x, min_y, max_x, max_y)
+      new_img_cropped = new_img.crop(bounding_box)
+      return new_img_cropped, new_img, bounding_box
 
 
 
 def uncertinity_function(location_expected, location_guessed):
       return math.sqrt((location_expected[0] - location_guessed[0]) ** 2  + (location_expected[1] - location_guessed[1]) ** 2)
+

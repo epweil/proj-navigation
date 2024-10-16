@@ -10,15 +10,20 @@ from PIL import Image, ImageDraw
 import math 
 import shutil
 import scipy
+from numpy.linalg import norm
+
 
 from helper import crop_hexagon
 class HEXAGON_IMAGE():
-      def __init__(self, image:Image,grid_locatation, pixel_locatation,  save_path = None):
+      def __init__(self, image:Image,hex_image_cropped:Image,bbox,  grid_locatation, pixel_locatation,  save_path = None):
             self.image = image
+            self.cropped_image = hex_image_cropped
+            self.bbox = bbox
             self.size = image.size
             self.pixel_locatation= pixel_locatation
             self.grid_locatation= grid_locatation
             self.save_path = save_path
+            self.embedding = None
             
             
             
@@ -30,14 +35,8 @@ class FIASS_Embedding():
             self.model = SentenceTransformer(model_name)
             
 
-      def generate_clip_embeddings(self,images:list[HEXAGON_IMAGE]):
-            embeddings = []
-            for row in images:
-                  for img in row:
-                        image = img.image
-                        embedding = self.model.encode(image)
-                        embeddings.append(embedding)
-            return embeddings
+      def generate_clip_embeddings(self,img:HEXAGON_IMAGE):
+            return self.model.encode(img.image)
 
       def create_faiss_index(self, embeddings, hex_images:list[HEXAGON_IMAGE], output_path = None):
             
@@ -66,7 +65,7 @@ class FIASS_Embedding():
                         for row in hex_images:
                               for img_path in row:
                                     f.write(img_path.save_path + '\n')
-                              
+                                    
                   # Save image locatations
                   with open(output_path + '.grid_locatation', 'w') as f:
                         for row in hex_images:
@@ -151,7 +150,7 @@ class FIASS_Embedding():
 
 
 class Input_Image():
-      def __init__(self, image_path, hex_radius, saved = False):
+      def __init__(self, image_path, hex_radius, FIASS:FIASS_Embedding, saved = False):
             self.image = Image.open(image_path)
             self.image_path = image_path
             self.image_height = self.image.size[0]
@@ -160,12 +159,17 @@ class Input_Image():
             self.hex_height = math.sqrt(3) * hex_radius
             self.hex_width = 2 * hex_radius
             self.num_hexes_width = math.ceil(self.image_width / self.hex_height ) +2
-            self.num_hexes_height = math.ceil(self.image_height / self.hex_width) +2
+            self.num_hexes_height = math.ceil(self.image_height / self.hex_width) +1
             self.hexagon_images = self.get_hexagons()
+            self.embeddings = []
             print("Done with GETTING HEXAGONS")
             self.hexagon_imgages_dir = self.image_path[:-4] + "/hexagon_images"
             if(not saved):
                   self.save_hexagon_images(self.hexagon_imgages_dir)
+            for row in self.hexagon_images:
+                  for hex_img in row:
+                        hex_img.embedding = FIASS.generate_clip_embeddings(hex_img)
+                        self.embeddings.append(hex_img.embedding)
             print("Done with SAVING HEXAGONS")
             
             
@@ -179,8 +183,8 @@ class Input_Image():
                   for r in range(self.num_hexes_width):
                         x = r * (self.hex_width - (math.cos(1.0472) * self.hex_radius)) 
                         y = q * (self.hex_height) + ((r%2) * math.sin(1.0472) * self.hex_radius) 
-                        hex_image = crop_hexagon(self.image, (x, y), self.hex_radius)
-                        hex_image = HEXAGON_IMAGE(hex_image, (q,r),(x,y))
+                        hex_image_cropped, hex_image_uncropped, bbox = crop_hexagon(self.image, (x, y), self.hex_radius)
+                        hex_image = HEXAGON_IMAGE(hex_image_uncropped,hex_image_cropped,bbox, (q,r),(x,y))
                         hex_images[q].append(hex_image)
             return hex_images
 
@@ -211,13 +215,15 @@ class Input_Image():
             
 class Refrence_Image(Input_Image):
       def __init__(self,image_path, FIASS:FIASS_Embedding,  hex_radius = 50,saved = False):
-            super().__init__(image_path, hex_radius, saved = saved)
+            super().__init__(image_path, hex_radius, FIASS, saved = saved)
             print("Done with SUPER")
             self.index_path = self.hexagon_imgages_dir +'/indexes/index'
+            
+      
             if(saved):
                   FIASS.load_faiss_index(self.index_path)
+                  
             else:
-                  self.embeddings = FIASS.generate_clip_embeddings(self.hexagon_images)
                   self.FAISS_INDEX = FIASS.create_faiss_index(self.embeddings,self.hexagon_images,self.hexagon_imgages_dir + '/indexes/')
                  
             
@@ -230,25 +236,32 @@ class Refrence_Image(Input_Image):
      
       
 class Query_Image(Input_Image):
-      def __init__(self,image_path, hex_radius = 50, saved = False):
-            super().__init__(image_path,  hex_radius = 50, saved = saved)
+      def __init__(self,image_path, FIASS:FIASS_Embedding, hex_radius = 50, saved = False):
+            super().__init__(image_path,  hex_radius=hex_radius, FIASS=FIASS, saved = saved)
       def get_best_guess_of_positon(self,postion:tuple, refrence:Refrence_Image, FIASS_INSTANCE:FIASS_Embedding, top_k = 5):
             image = self.hexagon_images[postion[1]][postion[0]].image
             query, retrieved_locatations,retrieved_grid_locatations, retrieved_pixel_locatations,  distances = FIASS_INSTANCE.retrieve_similar_images(image,top_k)
       
             distances = distances[0]
-            # print("Max Distance", distances.max())
-            # distances = distances/(distances).max()
-            # pred_coord_x = []
-            # pred_coord_y = []
-            # for locatation, distance in zip(retrieved_grid_locatations, distances):
-            #       retreived_coord_x,retreived_coord_y = locatation
-            #       retreived_coord_x = float(retreived_coord_x[1:])
-            #       retreived_coord_y = float(retreived_coord_y[:-1])
-            #       weight = np.exp(-distance)
-            #       pred_coord_x.append(retreived_coord_x*weight)
-            #       pred_coord_y.append(retreived_coord_y*weight)
-            # pred_coord_x = np.asarray(pred_coord_x).mean()
-            # pred_coord_y = np.asarray(pred_coord_y).mean()
+            print("Max Distance", distances.max())
+            distances = distances/(distances).max()
+            pred_coord_x = []
+            pred_coord_y = []
+            for locatation, distance in zip(retrieved_grid_locatations, distances):
+                  retreived_coord_x,retreived_coord_y = locatation
+                  retreived_coord_x = float(retreived_coord_x[1:])
+                  retreived_coord_y = float(retreived_coord_y[:-1])
+                  weight = np.exp(-distance)
+                  pred_coord_x.append(retreived_coord_x*weight)
+                  pred_coord_y.append(retreived_coord_y*weight)
+            pred_coord_x = np.asarray(pred_coord_x).mean()
+            pred_coord_y = np.asarray(pred_coord_y).mean()
             
-            return distances[0]
+            return [pred_coord_y, pred_coord_x]
+            #return distances[0] 
+      
+def similarity_of_pictures(img2:HEXAGON_IMAGE, img1:HEXAGON_IMAGE):
+      return np.dot(img1.embedding,img2.embedding)/(norm(img1.embedding)*norm(img2.embedding))
+            
+            
+            
