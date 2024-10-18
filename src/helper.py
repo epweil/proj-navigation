@@ -32,6 +32,19 @@ def crop_hexagon(hex_image,center, hex_radius):
 
 
 
-def uncertinity_function(location_expected, location_guessed):
+def uncertinity_function(location_matrix:np.array, moves_prob, prob_of_move):
+      updated_location_matrix = np.zeros(location_matrix.shape)
+      for i, row in enumerate(location_matrix):
+            for y, val in enumerate(location_matrix):
+                  for prob, move in moves_prob:
+                        area_to_move_to = [i,y] + move
+                        updated_location_matrix[area_to_move_to] += location_matrix[i,y] * prob
+      return updated_location_matrix
+                        
+                        
+                        
+
+
+            
       return math.sqrt((location_expected[0] - location_guessed[0]) ** 2  + (location_expected[1] - location_guessed[1]) ** 2)
 

@@ -10,7 +10,7 @@ import math
 from PIL import Image
 import random
 
-from feature_extraction import FIASS_Embedding, Query_Image, Refrence_Image, similarity_of_pictures
+from feature_extraction import Query_Image, Refrence_Image, similarity_of_pictures
 from helper import uncertinity_function
 # from setuptools import setup
 
@@ -25,9 +25,9 @@ class GPSD_ENV(gym.Env):
             self.hex_radius = 50
             
             
-            self.FIASS = FIASS_Embedding()
-            self.refrence_image = Refrence_Image(refrence_image_path, self.FIASS, self.hex_radius, SAVED)
-            self.query_image = Query_Image(query_image_path,self.FIASS, self.hex_radius, SAVED)
+            
+            self.refrence_image = Refrence_Image(refrence_image_path, self.hex_radius, SAVED)
+            self.query_image = Query_Image(query_image_path, self.hex_radius, SAVED)
             
             self.window_size = max(self.query_image.image.size[0], self.query_image.image.size[1])
             
