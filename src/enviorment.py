@@ -111,9 +111,9 @@ class GPSD_ENV(gym.Env):
                         #       possible_locatations.append([self._agent_predicted_location + self.get_movement_from_action(action), 0.025])
                         if (self._agent_predicted_location + self.get_movement_from_action(self._agent_predicted_location,action))[0] < self.size_height and (self._agent_predicted_location + self.get_movement_from_action(self._agent_predicted_location,action))[1] < self.size_width and min(self._agent_predicted_location + self.get_movement_from_action(self._agent_predicted_location,action)) >= 0: 
                               if(action == action_in):
-                                    possible_locatations.append([self._agent_predicted_location + self.get_movement_from_action(self._agent_predicted_location,action), 1])
+                                    possible_locatations.append([self._agent_predicted_location + self.get_movement_from_action(self._agent_predicted_location,action), 0.775])
                               else:
-                                    possible_locatations.append([self._agent_predicted_location + self.get_movement_from_action(self._agent_predicted_location,action), 0])
+                                    possible_locatations.append([self._agent_predicted_location + self.get_movement_from_action(self._agent_predicted_location,action), 0.025])
                   
                   
                   # probability_of_position_locations = []
