@@ -10,26 +10,24 @@ import math
 from PIL import Image
 import random
 
-from feature_extraction import FIASS_Embedding, Query_Image, Refrence_Image, similarity_of_pictures
-from helper import uncertinity_function
+from Landscape import Region, Year_ENV
 # from setuptools import setup
 
-CORRECT_MOVE_PROBABILITY = 0.775
-SAVED = True
+λ = 1
 
 class GPSD_ENV(gym.Env):
       metadata = { "render_fps": 4}
-      def __init__(self, refrence_image_path, query_image_path, render=None, size  = 10):
+      def __init__(self, Y_ENV:Year_ENV, render=None, size  = 10):
             self.render_mode = render
             super(GPSD_ENV, self).__init__()
             self.hex_radius = 50
             
+            self.area = Y_ENV
             
-            self.FIASS = FIASS_Embedding()
-            self.refrence_image = Refrence_Image(refrence_image_path, self.FIASS, self.hex_radius, SAVED)
-            self.query_image = Query_Image(query_image_path,self.FIASS, self.hex_radius, SAVED)
             
-            self.window_size = max(self.query_image.image.size[0], self.query_image.image.size[1])
+            
+            
+            self.window_size = max(self.area.Input_Image.image.size[0], self.area.Input_Image.image.size[1])
             
             self.observation_space= spaces.Dict({
                   'agent': spaces.Box(0, size - 1, shape=(2,), dtype=int),
@@ -51,36 +49,38 @@ class GPSD_ENV(gym.Env):
 
             # Hexagon size and geometry calculations
             
-            self.hex_height = math.sqrt(3) * self.hex_radius
-            self.hex_width = 2 * self.hex_radius
-            self.size = self.window_size // self.hex_width
+            self.hex_height = self.area.Input_Image.hex_height
+            self.hex_width = self.area.Input_Image.hex_width
             
-            self.size_width = math.ceil(self.window_size / self.hex_height ) +2
-            self.size_height = math.ceil(self.window_size / self.hex_width)
+            self.size_width = self.area.Input_Image.num_hexes_width
+            self.size_height = self.area.Input_Image.num_hexes_height
+            
+            print(self.area.Input_Image.num_hexes_width, self.area.Input_Image.num_hexes_height)
             
             
             
             
       
             
-      def get_movement_from_action(self, current_area, action):
-            if(current_area[1] % 2 == 0):
+      def get_movement_from_action(self, action):
+            
+            if(self._agent_location[1] % 2 == 0):
                   _action_to_direction = {
-                  0: np.array([-1, 1]),
-                  1: np.array([0, 1]),
-                  2: np.array([-1, -1]),
-                  3: np.array([0, -1]),
-                  4: np.array([1,0]),
-                  5: np.array([-1, 0])
+                  1: np.array([-1, 1]), #NE
+                  2: np.array([0, 1]), #SE
+                  5: np.array([-1, -1]),#NW
+                  4: np.array([0, -1]), #SW
+                  3: np.array([1,0]), #South 
+                  0: np.array([-1, 0]) #North 
                   }
             else:
                   _action_to_direction = {
-                  0: np.array([0, 1]),
-                  1: np.array([1, 1]),
-                  2: np.array([0, -1]),
-                  3: np.array([1, -1]),
-                  4: np.array([1,0]),
-                  5: np.array([-1, 0])
+                  1: np.array([0, 1]), #NE
+                  2: np.array([1, 1]),#SE
+                  5: np.array([0, -1]),#NW
+                  4: np.array([1, -1]), #SW
+                  3: np.array([1,0]), #South 
+                  0: np.array([-1, 0]) #North 
                   }
             movement = _action_to_direction[action]
             
@@ -93,80 +93,33 @@ class GPSD_ENV(gym.Env):
             
             
       def _get_obs(self):
-            return {"agent": self._agent_location, "target": self._target_location}
+            return {"agent": self._agent_location, "target": self.area.target_locatation}
             
      
             
       def _get_info(self, action_in = None):
             if(action_in is None):
-                  predicted_location_x = self._agent_predicted_location[1]
-                  predicted_location_y = self._agent_predicted_location[0] 
+                  MLP_SCORE = 0
             
             else:
-                  possible_locatations = []
-                  for action in range(6):
-                        # if(action == action_in):
-                        #       possible_locatations.append([self._agent_predicted_location + self.get_movement_from_action(action), 0.775])
-                        # else:
-                        #       possible_locatations.append([self._agent_predicted_location + self.get_movement_from_action(action), 0.025])
-                        if (self._agent_predicted_location + self.get_movement_from_action(self._agent_predicted_location,action))[0] < self.size_height and (self._agent_predicted_location + self.get_movement_from_action(self._agent_predicted_location,action))[1] < self.size_width and min(self._agent_predicted_location + self.get_movement_from_action(self._agent_predicted_location,action)) >= 0: 
-                              if(action == action_in):
-                                    possible_locatations.append([self._agent_predicted_location + self.get_movement_from_action(self._agent_predicted_location,action), 0.775])
-                              else:
-                                    possible_locatations.append([self._agent_predicted_location + self.get_movement_from_action(self._agent_predicted_location,action), 0.025])
+                  MLP_SCORE = 0
                   
-                  
-                  # probability_of_position_locations = []
-                  best_feature_mapping = []
-                  downward_image = self.query_image.hexagon_images[self._agent_location[0]][self._agent_location[1]]
-                  best_guess_y,best_guess_x = possible_locatations[0][0]
-                  best_prob = 0
-                  for (y,x),prob in possible_locatations:
-                        # probability_of_position_locations.append(uncertinity_function(self._agent_predicted_location, (y,x)) )
-                        guess = (similarity_of_pictures(downward_image, self.refrence_image.hexagon_images[y][x])*prob)
-                        if guess > best_prob:
-                              best_guess_x,best_guess_y = x,y
-                        
 
-                              
-                  # best_feature_mapping = np.asarray(best_feature_mapping)
-                  # probability_of_position_locations = np.asarray(probability_of_position_locations)
-                  
-                  # #Normalising Probability of Positions 
-                  # probability_of_position_locations = probability_of_position_locations / probability_of_position_locations.max()
-                  # probability_of_position_locations = 1-(probability_of_position_locations)
-                  # probability_of_position_locations = probability_of_position_locations / probability_of_position_locations.mean()
-                  
-                  #Normalising Feature Mapping
-                  # print(best_feature_mapping.mean(), print(best_feature_mapping.max()))
-                  # best_feature_mapping = best_feature_mapping / best_feature_mapping.max()
-                  # best_feature_mapping = best_feature_mapping / best_feature_mapping.mean()
-                  
-            
-                  predicted_location_x,predicted_location_y = best_guess_x,best_guess_y
 
                   
             
                   
             return({
-                  'distance': np.linalg.norm(np.array([predicted_location_x,predicted_location_y]) - np.array(self._target_location), ord=1),
-                  'predicted_locatation': (predicted_location_y, predicted_location_x)
+                  'prediction_similiarity': MLP_SCORE
             })
+            
+            
       def reset(self, starting_pos = None, seed = None, ):
             
             
-            # super().reset(seed=seed, options={'starting_pos':starting_pos})
             super().reset(seed=seed)
 
-            # Choose the agent's location uniformly at random
-            self._agent_location = [self.np_random.integers(0, self.size_height, size=1, dtype=int)[0], self.np_random.integers(0, self.size_width,size=1, dtype=int)[0]]
-            self._agent_predicted_location = self._agent_location
-            self._target_location = [self.np_random.integers(0, self.size_height, size=1, dtype=int)[0], self.np_random.integers(0, self.size_width, size=1, dtype=int)[0]]
-
-            # We will sample the target's location randomly until it does not coincide with the agent's location
-            # self._target_location = (5,10)
-            # self._agent_location = (1,1)
-            
+            self._agent_location = self.area.starting_locatation
             observation = self._get_obs()
             info = self._get_info()
 
@@ -176,24 +129,21 @@ class GPSD_ENV(gym.Env):
 
             return observation, info
       
+      
+      
+      
       def step(self,action_in):
-            #ADD NOISE 
-            action = action_in
-            if(random.random() <= 1-CORRECT_MOVE_PROBABILITY):
-                  action = random.randint(0,5)
-                  
-                  
-            direction = self.get_movement_from_action(self._agent_location,action)
-            # direction_predicted = self.get_movement_from_action(self._agent_predicted_location,action_in)
-            # expected_locatation = self._agent_predicted_location + direction_predicted
+            
+            action = self.area.move_drift(action_in)
+            direction = self.get_movement_from_action(action)
             self._agent_location = self._agent_location + direction
             
-            got_to_target = np.array_equal(self._agent_location, self._target_location)
-            
+            got_to_target = np.array_equal(self._agent_location,self.area.target_locatation)
             observation = self._get_obs()
             info = self._get_info(action_in)
-            self._agent_predicted_location = info['predicted_locatation']
-            reward = -info['distance']
+            reward = -1 +  λ*info['prediction_similiarity']
+            
+            
             
             if(got_to_target):
                   reward = 100000
@@ -204,11 +154,12 @@ class GPSD_ENV(gym.Env):
                   terminated = True
                   print("Fail")
             else:
-                  reward = -info['distance']**2
                   terminated = False
             if self.render_mode == "human":
                   self.render()
             return observation, reward, terminated, False, info 
+
+
 
       def hex_corner(self, center, size, i):
             """Helper function to calculate hexagon corners."""
@@ -223,7 +174,7 @@ class GPSD_ENV(gym.Env):
 
       def render(self, mode='human'):
             # Clear screen with background color
-            img = pygame.image.load(self.query_image.image_path)
+            img = pygame.image.load(self.area.Input_Image.image_path)
 
             self.screen.blit(img, (0, 0))
 
@@ -242,11 +193,8 @@ class GPSD_ENV(gym.Env):
                         if np.array_equal(self._agent_location, np.array([q, r])):
                               pygame.draw.circle(self.screen, self.agent_color, (int(x), int(y)), self.hex_radius // 2)
                          # If this hexagon is the target's position, draw the agent
-                        if np.array_equal(self._target_location, np.array([q, r])):
+                        if np.array_equal(self.area.target_locatation, np.array([q, r])):
                               pygame.draw.circle(self.screen, self.target_color, (int(x), int(y)), self.hex_radius // 2)
-                        # If this hexagon is the predicted position, draw the agent
-                        if np.array_equal(self._agent_predicted_location, np.array([q, r])):
-                              pygame.draw.circle(self.screen, self.predicted_locatation_color, (int(x), int(y)), self.hex_radius // 4)
 
             # Update the display
             pygame.display.flip()
@@ -259,9 +207,11 @@ class GPSD_ENV(gym.Env):
             pygame.quit()
             
 if __name__ == '__main__':
-      env = GPSD_ENV('./../images/2016.png', './../images/2018.png', render='human')
+      landscape = Region((11.22378,35.22622, 11.02178,35.02822)) 
+      env = GPSD_ENV(landscape.images[2018], render='human')
       env.reset()
       env.render()
+      
 
       # Pygame loop to interact and render with manual control (arrow keys)
       running = True
@@ -272,17 +222,17 @@ if __name__ == '__main__':
                         running = False
                   elif event.type == pygame.KEYDOWN:
                         if event.key == pygame.K_w: # Move north
-                              observation, reward, terminated, trun,  info  = env.step(5)  
+                              observation, reward, terminated, trun,  info  = env.step(0)  
                         elif event.key == pygame.K_s:  # Move south
-                              observation, reward, terminated,trun, info  =env.step(4) 
+                              observation, reward, terminated,trun, info  =env.step(3) 
                         elif event.key == pygame.K_e: # Move north-east
-                              observation, reward, terminated, trun,info  =env.step(0)  
-                        elif event.key == pygame.K_d: # Move south-east
                               observation, reward, terminated, trun,info  =env.step(1)  
+                        elif event.key == pygame.K_d: # Move south-east
+                              observation, reward, terminated, trun,info  =env.step(2)  
                         elif event.key == pygame.K_q:
-                             observation, reward, terminated, trun,info  =env.step(2)  # Move north-west
+                             observation, reward, terminated, trun,info  =env.step(5)  # Move north-west
                         elif event.key == pygame.K_a:
-                              observation, reward, terminated, trun,info  =env.step(3)  # Move south-west
+                              observation, reward, terminated, trun,info  =env.step(4)  # Move south-west
                         env.render()
                   if (terminated):
                         env.reset()
