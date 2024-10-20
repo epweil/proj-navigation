@@ -149,7 +149,7 @@ class GPSD_ENV(gym.Env):
                   reward = 100000
                   terminated = True
                   print("Success")
-            elif(self._agent_location.min() < 0 or self._agent_location.max() > max(self.size_height, self.size_width)):
+            elif(self._agent_location.min() < 0 or self._agent_location[0] > self.size_height or  self._agent_location[1] > self.size_width):
                   reward = -100000
                   terminated = True
                   print("Fail")

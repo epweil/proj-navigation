@@ -59,7 +59,7 @@ class Input_Image():
             self.hex_radius = hex_radius
             self.hex_height = math.sqrt(3) * hex_radius
             self.hex_width = 2 * hex_radius
-            self.num_hexes_width = math.ceil(self.image_width / self.hex_width )
+            self.num_hexes_width = math.ceil(self.image_width / self.hex_width )+2
             self.num_hexes_height = math.ceil(self.image_height / self.hex_height)
             self.hexagon_images = self.get_hexagons()
             
