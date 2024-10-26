@@ -12,14 +12,15 @@ import shutil
 import scipy
 from numpy.linalg import norm
 
-
+RESIZE = 150
 from helper import crop_hexagon
 class HEXAGON_IMAGE():
       def __init__(self, image:Image,hex_image_cropped:Image,bbox,  grid_locatation, pixel_locatation,  save_path = None):
             self.image = image
-            self.cropped_image = hex_image_cropped
+            self.cropped_image = hex_image_cropped.resize((RESIZE, RESIZE))
             self.bbox = bbox
             self.size = image.size
+            self.cropped_size = self.cropped_image.size
             self.pixel_locatation= pixel_locatation
             self.grid_locatation= grid_locatation
             self.save_path = save_path

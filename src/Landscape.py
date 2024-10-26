@@ -10,6 +10,7 @@ from feature_extraction import FIASS_Embedding, Input_Image
 outProj = Proj(init='epsg:3857') 
 
 inProj = Proj(init='epsg:4326')
+
 wms = WebMapService(f"https://sh.dataspace.copernicus.eu/ogc/wms/{SENTENIAL2_TOKEN}")
 
 class Region():

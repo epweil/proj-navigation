@@ -6,7 +6,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 class Preduction_MLP(nn.Module):
     def __init__(self):
         super(Preduction_MLP, self).__init__()
-        self.linear = nn.Linear(28*28, 10)
+        self.linear = nn.Linear(512, 30)
+        self.RELU = nn.ReLU()
+        self.hidden_1 = nn.Linear(30,10)
+        
         
         
     def forward(self, x):
