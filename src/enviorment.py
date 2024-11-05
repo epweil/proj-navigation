@@ -18,10 +18,10 @@ from Landscape import Region, Year_ENV
 λ = 1
 class GPSD_ENV(gym.Env):
       metadata = { "render_fps": 4}
-      def __init__(self, Y_ENV:Year_ENV, render=None, size  = 10, start_position = None , target_position= None):
+      def __init__(self, Y_ENV:Year_ENV, render=None, size  = 10, start_position = None , target_position= None, tracker = None):
             self.render_mode = render
             super(GPSD_ENV, self).__init__()
-            
+            self.tracker = tracker
             self.area = Y_ENV
             if(start_position):
                   try:
@@ -45,7 +45,11 @@ class GPSD_ENV(gym.Env):
             
             self.hex_height = self.area.Input_Image.hex_height
             self.hex_width = self.area.Input_Image.hex_width
-            self.observation_space= spaces.Box(low=0, high=256, shape=(self.area.Input_Image.hexagon_images[0][0].cropped_size[0],self.area.Input_Image.hexagon_images[0][0].cropped_size[1] ,3))
+            self.size_width = self.area.Input_Image.num_hexes_width
+            self.size_height = self.area.Input_Image.num_hexes_height
+            
+            self.observation_space= spaces.Box(low=0, high=256, shape=(self.area.Input_Image.hexagon_images[0][0].cropped_size[0],self.area.Input_Image.hexagon_images[0][0].cropped_size[1]))
+            # self.observation_space= spaces.Box(low=0, high=max(self.size_width, self.size_height), shape=(2,), dtype=np.int64)
             
             self.action_space = spaces.Discrete(6)
             
@@ -64,8 +68,7 @@ class GPSD_ENV(gym.Env):
             
             
             
-            self.size_width = self.area.Input_Image.num_hexes_width
-            self.size_height = self.area.Input_Image.num_hexes_height
+            
             
             
             
@@ -103,7 +106,8 @@ class GPSD_ENV(gym.Env):
              
             
       def _get_obs(self):
-            arr = np.array(self.area.Input_Image.hexagon_images[self._agent_location[0]][self._agent_location[1]].cropped_image.convert("RGB"))
+            arr = np.array(self.area.Input_Image.hexagon_images[self._agent_location[0]][self._agent_location[1]].cropped_image.convert("L"))
+            # arr = np.asarray(self._agent_location)
             return arr
       
             
@@ -124,15 +128,21 @@ class GPSD_ENV(gym.Env):
             return({
                   'MLP_SCORE': MLP_SCORE,
                   'Running_Reward': self.running_reward
+                  
             })
             
             
-      def reset(self, seed = None  ):
+      def reset(self, seed = None ):
             
-            
+            self.steps = 0
             super().reset(seed=seed)
-
-            self._agent_location = self.area.starting_locatation
+            self._agent_location = [np.random.randint(0, self.area.Input_Image.num_hexes_height, size=1, dtype=int)[0], np.random.randint(0, self.area.Input_Image.num_hexes_width,size=1, dtype=int)[0]] #self.area.starting_locatation
+            while (self._agent_location == self.area.target_locatation):
+                  self._agent_location = [np.random.randint(0, self.area.Input_Image.num_hexes_height, size=1, dtype=int)[0], np.random.randint(0, self.area.Input_Image.num_hexes_width,size=1, dtype=int)[0]]
+                  
+            if(self.tracker):
+                  self.tracker.reset()
+                  self.tracker.step(None, self._agent_location, 0)
             self.running_reward = 0
             
             observation = self._get_obs()
@@ -147,13 +157,15 @@ class GPSD_ENV(gym.Env):
       
       
       def step(self,action_in):
-            
+            self.steps += 1
             action = self.area.move_drift(action_in)
             action = action_in
             direction = self.get_movement_from_action(action)
             self._agent_location = self._agent_location + direction
             
+            
             observation = None
+            # observation = np.asarray(self._agent_location)
             info = {}
             got_to_target = np.array_equal(self._agent_location,self.area.target_locatation)
             
@@ -162,20 +174,25 @@ class GPSD_ENV(gym.Env):
             
             
             if(got_to_target):
-                  reward = 1
+                  reward = 10
                   terminated = True
-                  print("Success", self.running_reward + reward)
+                  info['SUCESS'] = True
             elif(self._agent_location.min() < 0 or self._agent_location[0] >= self.size_height or  self._agent_location[1] >= self.size_width):
-                  reward = -1
+                  reward = -10
                   terminated = True
-                  # print("Fail", self.running_reward)
+                  info['SUCESS'] = False
+            elif(self.steps > 25):
+                  reward = -10
+                  terminated = True
+                  info['SUCESS'] = False
             else:
                   terminated = False
                   info = self._get_info(action_in)
                   observation = self._get_obs()
-                  reward = -0.01 +  λ*info['MLP_SCORE']
+                  reward = -0.1 + λ*info['MLP_SCORE']
             self.running_reward += reward
-            
+            if(self.tracker):
+                  self.tracker.step(action_in, self._agent_location, self.running_reward)
                   
                   
             if self.render_mode == "human":
