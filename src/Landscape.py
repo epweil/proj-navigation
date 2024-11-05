@@ -41,8 +41,11 @@ class Year_ENV():
             self.year = year
             save_dir = f'./../images/{landscape.bbox[0]}-{landscape.bbox[1]}-{landscape.bbox[2]}-{landscape.bbox[3]}/'
             save_path = f'./../images/{landscape.bbox[0]}-{landscape.bbox[1]}-{landscape.bbox[2]}-{landscape.bbox[3]}/{year}.jpeg'
+            #Make Path to save images 
             if(not os.path.exists(save_dir)):
                   os.mkdir(save_dir)
+                  
+            #If images have been pulled, dont pull them again
             if(os.path.isfile(save_path)):
                   image = Image.open(save_path)
             else:
@@ -55,9 +58,7 @@ class Year_ENV():
                                     time=f'{year}-10-20T12:00:00Z'
                                     
                                     )
-                  
                   image = Image.open(res)
-                  
                   image.save(save_path)
             
             self.Input_Image = Input_Image(save_path,image,  landscape.hex_size, landscape.FIASS )
@@ -65,7 +66,7 @@ class Year_ENV():
             self.target_locatation  = [np.random.randint(0, self.Input_Image.num_hexes_height, size=1, dtype=int)[0], np.random.randint(0, self.Input_Image.num_hexes_width,size=1, dtype=int)[0]]
             
             
-            #Correct, clockwise_1, counter_clockwise_1, clockwise_2, counter_clockwise_2, reverse
+            #MOVE NOISE  (Correct, clockwise_1, counter_clockwise_1, clockwise_2, counter_clockwise_2, reverse)
             move_prob = np.array([1, random.random() * 0.1, random.random() * 0.1, random.random() * 0.03 ,random.random() * 0.03,random.random() * 0.01] )
             self.move_prob = move_prob/move_prob.mean()
             
