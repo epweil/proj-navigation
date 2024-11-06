@@ -18,11 +18,12 @@ from Landscape import Region, Year_ENV
 λ = 1
 class GPSD_ENV(gym.Env):
       metadata = { "render_fps": 4}
-      def __init__(self, Y_ENV:Year_ENV, render=None, size  = 10, start_position = None , target_position= None, tracker = None):
+      def __init__(self, Y_ENV:Year_ENV, render=None, size  = 10, start_position = None , target_position= None, tracker = None, mode= 'RGB'):
             self.render_mode = render
             super(GPSD_ENV, self).__init__()
             self.tracker = tracker
             self.area = Y_ENV
+            self.mode = mode
             if(start_position):
                   try:
                         self.area.Input_Image.hexagon_images[start_position[0]][start_position[1]]
@@ -47,8 +48,10 @@ class GPSD_ENV(gym.Env):
             self.hex_width = self.area.Input_Image.hex_width
             self.size_width = self.area.Input_Image.num_hexes_width
             self.size_height = self.area.Input_Image.num_hexes_height
-            
-            self.observation_space= spaces.Box(low=0, high=255, shape=(self.area.Input_Image.hexagon_images[0][0].cropped_size[0],self.area.Input_Image.hexagon_images[0][0].cropped_size[1], 3),dtype=np.uint8)
+            if(mode == 'RGB'):
+                  self.observation_space= spaces.Box(low=0, high=255, shape=(self.area.Input_Image.hexagon_images[0][0].cropped_size[0],self.area.Input_Image.hexagon_images[0][0].cropped_size[1], 3),dtype=np.uint8)
+            else:
+                  self.observation_space= spaces.Box(low=0, high=255, shape=(1,self.area.Input_Image.hexagon_images[0][0].cropped_size[0],self.area.Input_Image.hexagon_images[0][0].cropped_size[1]),dtype=np.uint8)
             # self.observation_space= spaces.Box(low=0, high=max(self.size_width, self.size_height), shape=(2,), dtype=np.int64)
             
             self.action_space = spaces.Discrete(6)
@@ -106,8 +109,9 @@ class GPSD_ENV(gym.Env):
              
             
       def _get_obs(self):
-            arr = np.array(self.area.Input_Image.hexagon_images[self._agent_location[0]][self._agent_location[1]].cropped_image.convert("RGB")).astype(np.uint8)
-            # arr = np.asarray(self._agent_location)
+            arr = np.array(self.area.Input_Image.hexagon_images[self._agent_location[0]][self._agent_location[1]].cropped_image.convert(self.mode)).astype(np.uint8)
+            if(self.mode == 'L'):
+                  arr = arr.reshape((1,arr.shape[0], arr.shape[1]))
             return arr
       
             
@@ -163,9 +167,10 @@ class GPSD_ENV(gym.Env):
             direction = self.get_movement_from_action(action)
             self._agent_location = self._agent_location + direction
             
-            
-            observation = np.zeros((self.area.Input_Image.hexagon_images[0][0].cropped_size[0],self.area.Input_Image.hexagon_images[0][0].cropped_size[1], 3))
-            # observation = np.asarray(self._agent_location)
+            if(self.mode == 'RGB'):
+                  observation = np.zeros((self.area.Input_Image.hexagon_images[0][0].cropped_size[0],self.area.Input_Image.hexagon_images[0][0].cropped_size[1], 3))
+            else:
+                  observation = np.zeros((1,self.area.Input_Image.hexagon_images[0][0].cropped_size[0],self.area.Input_Image.hexagon_images[0][0].cropped_size[1]))
             info = {}
             got_to_target = np.array_equal(self._agent_location,self.area.target_locatation)
             
