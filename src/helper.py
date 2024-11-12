@@ -2,6 +2,9 @@ import math
 from PIL import Image, ImageDraw
 import numpy as np
 
+"""
+HELPER FUNCTIONS TO GATHER HEXAGON IMAGES 
+"""
 
 
 def hex_corner(center, size, i):
@@ -30,8 +33,4 @@ def crop_hexagon(hex_image,center, hex_radius):
       new_img_cropped = new_img.crop(bounding_box)
       return new_img_cropped, new_img, bounding_box
 
-
-
-def uncertinity_function(location_expected, location_guessed):
-      return math.sqrt((location_expected[0] - location_guessed[0]) ** 2  + (location_expected[1] - location_guessed[1]) ** 2)
 
